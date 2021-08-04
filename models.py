@@ -58,23 +58,28 @@ class lossnet(nn.Module):
         else:
             self.act = None
     
-    def forward(self,xref,xper):
+    #def forward(self,xref,xper):
+    def forward(self,x):
         # xref and xper are [batch,L]
-        xref = xref.unsqueeze(1)
-        xper = xper.unsqueeze(1)
-        dist = 0
+        x = x.unsqueeze(1)
+        #xper = xper.unsqueeze(1)
+        #dist = 0
         for iconv in range(self.nconv):
-            xref = self.convs[iconv](xref)
-            xper = self.convs[iconv](xper)
-            diff = (xref-xper).permute(0,2,1) # channel last
-            wdiff = diff*self.chan_w[iconv]
-            wdiff = torch.sum(torch.abs(wdiff),dim=(1,2))/diff.shape[1]/diff.shape[2] # average by time and channel dimensions
-            dist = dist+wdiff
-        if self.dist_act=='exp':
-            dist = torch.exp(torch.clamp(dist,max=20.))/(10**5) # exp(20) ~ 4*10**8
-        else:
-            dist = self.act(dist)
-        return dist
+            x = self.convs[iconv](x)
+
+        return x
+        ############################## COMMENTED TO GET EMBEDDINGS #############################################    
+        #     xper = self.convs[iconv](xper)
+        #     diff = (xref-xper).permute(0,2,1) # channel last
+        #     wdiff = diff*self.chan_w[iconv]
+        #     wdiff = torch.sum(torch.abs(wdiff),dim=(1,2))/diff.shape[1]/diff.shape[2] # average by time and channel dimensions
+        #     dist = dist+wdiff
+        # if self.dist_act=='exp':
+        #     dist = torch.exp(torch.clamp(dist,max=20.))/(10**5) # exp(20) ~ 4*10**8
+        # else:
+        #     dist = self.act(dist)
+        # return dist
+        #########################################################################################################
 
 class classifnet(nn.Module):
     def __init__(self,ndim=[16,6],dp=0.1,BN=1,classif_act='no'):
@@ -137,14 +142,19 @@ class JNDnet(nn.Module):
         self.CE = nn.CrossEntropyLoss(reduction='mean')
         self.dev = dev
     
-    def forward(self,xref,xper,labels):
-        dist = self.model_dist.forward(xref,xper)
-        pred = self.model_classif.forward(dist)
+    
+    def forward(self, x):
+        return self.model_dist(x)
+############################################ COMMENTED TO GET EMBEDDINGS ##################################
+#    def forward(self,xref,xper,labels):
+#        dist = self.model_dist.forward(xref,xper)
+#        pred = self.model_classif.forward(dist)
 #        loss = self.CE(pred,labels.squeeze(1)) # pred is [batch,2] and labels [batch] long and binary
-        loss = self.CE(pred,torch.squeeze(labels,-1))
-        class_prob = F.softmax(pred,dim=-1)
-        class_pred = torch.argmax(class_prob,dim=-1)
-        return loss,dist,class_pred,class_prob
+        # loss = self.CE(pred,torch.squeeze(labels,-1))
+        # class_prob = F.softmax(pred,dim=-1)
+        # class_pred = torch.argmax(class_prob,dim=-1)
+        # return loss,dist,class_pred,class_prob
+############################################################################################################
     
     def grad_check(self,minibatch,optimizer):
         xref = minibatch[0].to(self.dev)
